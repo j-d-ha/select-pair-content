@@ -4,10 +4,9 @@ import com.intellij.DynamicBundle
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.PropertyKey
 
-@NonNls
-private const val BUNDLE = "messages.MyBundle"
+@NonNls private const val BUNDLE = "messages.SelectPairContentBundle"
 
-object MyBundle : DynamicBundle(BUNDLE) {
+object SelectPairContentBundle : DynamicBundle(BUNDLE) {
 
     @JvmStatic
     fun message(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any) =
