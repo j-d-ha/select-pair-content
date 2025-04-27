@@ -316,7 +316,27 @@ fun Caret.selectEnclosingTypingPairs(
         val nextRange =
             when {
                 isSelectionShrinking -> candidateRanges.maxByOrNull { it.length }
-                else -> candidateRanges.firstOrNull()
+                else -> {
+                    // Filter out ranges where either the start or end character matches the start or end character of the current selection
+                    if (currentSelection.isEmpty) {
+                        candidateRanges.firstOrNull()
+                    } else {
+                        candidateRanges.firstOrNull { candidateRange ->
+                            // Only proceed if both ranges have content
+                            if (candidateRange.length >= 2 && currentSelection.length >= 2) {
+                                val currentStartChar = contents[currentSelection.startOffset]
+                                val currentEndChar = contents[currentSelection.endOffset - 1]
+                                val candidateStartChar = contents[candidateRange.startOffset]
+                                val candidateEndChar = contents[candidateRange.endOffset - 1]
+
+                                // Ensure neither start nor end characters match
+                                !(currentStartChar == candidateStartChar || currentEndChar == candidateEndChar)
+                            } else {
+                                true // If either range is too small, don't filter
+                            }
+                        }
+                    }
+                }
             }
 
         // Apply the selection
