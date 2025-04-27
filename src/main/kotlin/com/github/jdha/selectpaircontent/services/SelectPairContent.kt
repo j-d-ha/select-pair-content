@@ -38,7 +38,6 @@ object PairConstants {
 
 /** Utilities for handling typing pairs and text selections. */
 object PairSelectionUtils {
-    private val LOG = Logger.getInstance(PairSelectionUtils::class.java)
 
     /**
      * Checks if a character is an ending character of a typing pair.
