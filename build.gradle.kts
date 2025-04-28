@@ -24,7 +24,7 @@ plugins {
 
 group = providers.gradleProperty("pluginGroup").get()
 
-version = providers.gradleProperty("pluginVersion").get()
+version = project.changelog.getAll().keys.toList().first { Regex("""\d+\.\d+\.\d+""").matches(it) }
 
 // Set the JVM language level used to build the project.
 kotlin { jvmToolchain(21) }
@@ -75,8 +75,10 @@ idea {
 // https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-extension.html
 intellijPlatform {
     pluginConfiguration {
+        val changelog = project.changelog // local variable for configuration cache compatibility
+
         name = providers.gradleProperty("pluginName")
-        version = providers.gradleProperty("pluginVersion")
+        version = changelog.getAll().keys.toList().first { Regex("""\d+\.\d+\.\d+""").matches(it) }
 
         // Extract the <!-- Plugin description --> section from README.md and provide for the
         // plugin's manifest
@@ -97,7 +99,6 @@ intellijPlatform {
                 }
             }
 
-        val changelog = project.changelog // local variable for configuration cache compatibility
         // Get the latest available change notes from the changelog file
         changeNotes =
             providers.gradleProperty("pluginVersion").map { pluginVersion ->
