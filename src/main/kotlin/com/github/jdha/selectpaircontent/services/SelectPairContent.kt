@@ -20,7 +20,7 @@ object PairConstants {
     /**
      * Map of matching typing pairs. Key is the ending character, value is the starting character.
      */
-    val TYPING_PAIRS =
+    val MATCHED_PAIRS =
         mapOf(
             '\'' to '\'',
             '"' to '"',
@@ -46,20 +46,80 @@ object PairSelectionUtils {
      * @return True if the character is an ending character of a typing pair.
      */
     fun isTypingPairEndingChar(character: Char): Boolean =
-        PairConstants.TYPING_PAIRS.containsKey(character)
+        PairConstants.MATCHED_PAIRS.containsKey(character)
+
+    // /**
+    //  * Checks if the text range is enclosed by matching typing pairs.
+    //  *
+    //  * @param contents The document content.
+    //  * @param textRange The text range to check.
+    //  * @return True if the text range is enclosed by matching typing pairs.
+    //  */
+    // fun isEnclosingTypingPairsRange(contents: CharSequence, textRange: TextRange): Boolean =
+    //     textRange.length >= PairConstants.MINIMUM_SELECTION_SIZE &&
+    //         isTypingPairEndingChar(contents[textRange.endOffset - 1]) &&
+    //         PairConstants.TYPING_PAIRS[contents[textRange.endOffset - 1]] ==
+    //             contents[textRange.startOffset]
 
     /**
-     * Checks if the text range is enclosed by matching typing pairs.
+     * Checks if the text range is enclosed by matching typing pairs that are properly balanced.
      *
      * @param contents The document content.
      * @param textRange The text range to check.
      * @return True if the text range is enclosed by matching typing pairs.
      */
-    fun isEnclosingTypingPairsRange(contents: CharSequence, textRange: TextRange): Boolean =
-        textRange.length >= PairConstants.MINIMUM_SELECTION_SIZE &&
-            isTypingPairEndingChar(contents[textRange.endOffset - 1]) &&
-            PairConstants.TYPING_PAIRS[contents[textRange.endOffset - 1]] ==
-                contents[textRange.startOffset]
+    fun isEnclosingTypingPairsRange(contents: CharSequence, textRange: TextRange): Boolean {
+        if (textRange.length < PairConstants.MINIMUM_SELECTION_SIZE) return false
+
+        val startChar = contents[textRange.startOffset]
+        val endChar = contents[textRange.endOffset - 1]
+
+        // Check if the start and end characters form a valid pair
+        if (!isTypingPairEndingChar(endChar) || PairConstants.MATCHED_PAIRS[endChar] != startChar) {
+            return false
+        }
+
+        // Special handling for pairs where start and end characters are the same (quotes,
+        // backticks)
+        // we count the occurrences of that character and if the found count is not 2, we return
+        // false
+        if (startChar == endChar) {
+            val count = contents.subSequence(textRange.startOffset, textRange.endOffset).count {
+                it == startChar
+            }
+
+            return count == 2 || count % 2 != 0
+        }
+
+        // For pairs with different start/end characters (brackets, parentheses, etc.)
+        // Track all kinds of brackets using a stack-based approach
+        val stack = mutableListOf<Char>()
+        stack.add(startChar) // Push the first character to initialize the stack
+
+        // Process the content between the first and last characters
+        for (i in textRange.startOffset + 1 until textRange.endOffset - 1) {
+            val c = contents[i]
+
+            if (PairConstants.MATCHED_PAIRS.values.contains(c)) {
+                // Found an opening character
+                stack.add(c)
+            } else if (isTypingPairEndingChar(c)) {
+                // Found a closing character
+                val expectedStart = PairConstants.MATCHED_PAIRS[c]
+                if (stack.isNotEmpty() && stack.last() == expectedStart) {
+                    // Matching pair found, pop from stack
+                    stack.removeAt(stack.size - 1)
+                } else {
+                    // Unbalanced closing character, push to mark as invalid
+                    stack.add(c)
+                }
+            }
+        }
+
+        // For a valid pair, after processing the inner content, our stack should
+        // contain only the initial opening character
+        return stack.size == 1 && stack.first() == startChar
+    }
 
     /**
      * Generates a sequence of PSI elements using the provided operator.
@@ -157,8 +217,8 @@ class PairSelectionService {
     fun findElementsWithinSelection(
         dataContext: DataContext,
         currentSelection: TextRange,
-    ): List<PsiElement> {
-        return CommonDataKeys.PSI_FILE.getData(dataContext)?.let { psiFile ->
+    ): List<PsiElement> =
+        CommonDataKeys.PSI_FILE.getData(dataContext)?.let { psiFile ->
             val result = mutableListOf<PsiElement>()
 
             fun traverse(element: PsiElement) {
@@ -173,7 +233,6 @@ class PairSelectionService {
             traverse(psiFile)
             result
         } ?: emptyList()
-    }
 
     /**
      * Find matching sibling pairs for the given element.
@@ -199,7 +258,7 @@ class PairSelectionService {
 
         for (nextSibling in nextSiblings) {
             val endingChar = contents[nextSibling.textOffset]
-            val expectedStartChar = PairConstants.TYPING_PAIRS[endingChar] ?: continue
+            val expectedStartChar = PairConstants.MATCHED_PAIRS[endingChar] ?: continue
 
             val prevSiblings =
                 PairSelectionUtils.generateElementSequence(element) { it.prevSibling }
@@ -245,6 +304,7 @@ class PairSelectionService {
         return findMatchingSiblingPairs(contents, element, config)
     }
 }
+
 
 /**
  * Extension function for the Caret class to select enclosing typing pairs. This is the main entry
@@ -317,7 +377,8 @@ fun Caret.selectEnclosingTypingPairs(
             when {
                 isSelectionShrinking -> candidateRanges.maxByOrNull { it.length }
                 else -> {
-                    // Filter out ranges where either the start or end character matches the start or end character of the current selection
+                    // Filter out ranges where either the start or end character matches the start
+                    // or end character of the current selection
                     if (currentSelection.isEmpty) {
                         candidateRanges.firstOrNull()
                     } else {
@@ -330,7 +391,8 @@ fun Caret.selectEnclosingTypingPairs(
                                 val candidateEndChar = contents[candidateRange.endOffset - 1]
 
                                 // Ensure neither start nor end characters match
-                                !(currentStartChar == candidateStartChar || currentEndChar == candidateEndChar)
+                                !(currentStartChar == candidateStartChar ||
+                                    currentEndChar == candidateEndChar)
                             } else {
                                 true // If either range is too small, don't filter
                             }
