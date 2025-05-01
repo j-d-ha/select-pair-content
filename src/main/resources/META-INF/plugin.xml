@@ -9,14 +9,14 @@
     <resource-bundle>messages.SelectPairContentBundle</resource-bundle>
 
     <actions>
-        <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentAction"
-                class="com.github.jdha.selectpaircontent.actions.SelectPairContentAction"
+        <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentExpandingAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectPairContentExpandingAction"
                 text="Select Pair Content">
             <keyboard-shortcut keymap="$default" first-keystroke="alt a"/>
         </action>
 
-        <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentReverseAction"
-                class="com.github.jdha.selectpaircontent.actions.SelectPairContentReverseAction"
+        <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
                 text="Select Pair Content Reverse">
             <keyboard-shortcut keymap="$default" first-keystroke="shift alt a"/>
         </action>
