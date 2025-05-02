@@ -2,437 +2,440 @@ package com.github.jdha.selectpaircontent.services
 
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Caret
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiUtilCore
 import com.intellij.refactoring.actions.BaseRefactoringAction
-import kotlin.collections.get
 
-/** Package for the SelectPairContent plugin functionality. */
-// Initialize logger for the main function
-private val LOG = Logger.getInstance("com.github.jdha.selectpaircontent.services.SelectPairContent")
-
-/** Constants for the plugin functionality. */
+/** Constants and utility functions for pair matching */
 object PairConstants {
-    /**
-     * Map of matching typing pairs. Key is the ending character, value is the starting character.
-     */
-    val MATCHED_PAIRS =
+    /** Map of matching pairs: opening char -> closing char */
+    val PAIR_MATCHES =
         mapOf('\'' to '\'', '"' to '"', '`' to '`', '[' to ']', '(' to ')', '{' to '}', '<' to '>')
 
-    /** Minimum selection size to consider for matching pairs. */
+    /** Reverse map: closing char -> opening char */
+    val OPENING_CHARS by lazy { PAIR_MATCHES.entries.associate { (k, v) -> v to k } }
+
+    /** Minimum size for pair selection */
     const val MINIMUM_SELECTION_SIZE = 2
+
+    /** Check if char is an opening character */
+    fun isOpeningChar(char: Char): Boolean = char in PAIR_MATCHES
+
+    /** Check if char is a closing character */
+    fun isClosingChar(char: Char): Boolean = char in OPENING_CHARS
+
+    /** Get matching opening char for a closing char */
+    fun getMatchingOpeningChar(char: Char): Char? = OPENING_CHARS[char]
+
+    /** Get matching closing char for an opening char */
+    fun getMatchingClosingChar(char: Char): Char? = PAIR_MATCHES[char]
+
+    /** Check if two chars form a valid pair */
+    fun isValidPair(first: Char, last: Char): Boolean =
+        isOpeningChar(first) && PAIR_MATCHES[first] == last
 }
 
-fun Caret.selectEnclosingTypingPairsExpanding(dataContext: DataContext) {
-    val elementAtCaret = getElementAtCaret(dataContext) ?: return
+/** Get inner content of a range (excluding first and last characters) */
+private fun TextRange.inner(): TextRange = TextRange.create(startOffset + 1, endOffset - 1)
 
-    val currentSelection = TextRange.create(selectionStart, selectionEnd)
-    val caretOffset = offset
+/** Sealed class to represent a pair of characters with validity */
+private sealed class PairResult {
+    data class Valid(val range: TextRange) : PairResult()
 
-    val newSelection = getExpandSelection(elementAtCaret, currentSelection, caretOffset)
-
-    newSelection?.let { setSelection(it.startOffset, it.endOffset) }
+    data class Invalid(val range: TextRange) : PairResult()
 }
 
-fun Caret.selectEnclosingTypingPairsShrinking(dataContext: DataContext, editor: Editor) {
-    val elementAtCaret = getElementAtCaret(dataContext) ?: return
+/** Extension functions for PsiElement to check for valid pairs */
+private fun PsiElement.hasValidPair(): Boolean {
+    val text = this.text
+    if (text.length < PairConstants.MINIMUM_SELECTION_SIZE) return false
+    return PairConstants.isValidPair(text.first(), text.last())
+}
 
-    val currentSelection = TextRange.create(selectionStart, selectionEnd)
-    val caretOffset = offset
+private fun PsiElement.pairTextRange(): TextRange? = if (hasValidPair()) textRange else null
 
-    val newSelection = getShrinkSelection(elementAtCaret, editor, currentSelection, caretOffset)
+/** Extract and validate character pair from element */
+private fun validateElementPair(element: PsiElement): PairResult? {
+    val elementText = element.text
+    if (elementText.length < PairConstants.MINIMUM_SELECTION_SIZE) return null
 
-    // If already just a caret position with no selection, nothing to shrink
-    if (currentSelection.isEmpty) {
-        return
+    val firstChar = elementText.first()
+    val lastChar = elementText.last()
+
+    return when {
+        PairConstants.isValidPair(firstChar, lastChar) -> PairResult.Valid(element.textRange)
+        else -> PairResult.Invalid(element.textRange)
     }
-
-    newSelection?.let { setSelection(it.startOffset, it.endOffset) }
 }
 
-fun walkElementAndParents(element: PsiElement) {
-    element.firstChild?.let { child -> if (child.node.elementType.toString() == "FILE") return }
-
-    println("Element: ${element.javaClass.simpleName}, Text: ${element.text}")
-
-    // Get all child nodes from the AST
-    val childNodes = element.node.getChildren(null)
-
-    // Print all child nodes
-    childNodes.forEachIndexed { index, node ->
-        val childElement = node.psi
-        println("  Child $index: ${childElement.javaClass.simpleName}, Text: ${childElement.text}")
-
-        // Check if this is a leaf element (no further children in the AST)
-        val isLeaf = node.firstChildNode == null
-        if (isLeaf) {
-            println("    --> This is a leaf element")
+/** Find and process character pairs in different modes */
+private fun processPair(
+    pairResult: PairResult,
+    currentSelection: TextRange,
+    isExpanding: Boolean,
+): TextRange? {
+    val fullRange =
+        when (pairResult) {
+            is PairResult.Valid -> pairResult.range
+            is PairResult.Invalid -> return null
         }
-    }
 
-    // Process parent if it exists
-    val parent = element.parent
-    if (parent != null) {
-        println("\nMoving up to parent: ${parent.javaClass.simpleName}\n")
-        walkElementAndParents(parent)
+    if (currentSelection == fullRange) return null
+
+    val innerContent = fullRange.inner()
+
+    return when {
+        isExpanding -> if (currentSelection == innerContent) fullRange else innerContent
+        else -> if (currentSelection == innerContent) innerContent else fullRange
     }
 }
 
+/** Common handler for element selection (works for both expanding and shrinking) */
+private fun handleElementSelection(
+    element: PsiElement,
+    currentSelection: TextRange,
+    isExpanding: Boolean,
+): TextRange? = validateElementPair(element)?.let { processPair(it, currentSelection, isExpanding) }
+
+/** Get PSI element at caret position */
 fun getElementAtCaret(dataContext: DataContext): PsiElement? {
     val editor = CommonDataKeys.EDITOR.getData(dataContext) ?: return null
     val psiFile = CommonDataKeys.PSI_FILE.getData(dataContext) ?: return null
     val templateFile = PsiUtilCore.getTemplateLanguageFile(psiFile)
 
-    // Use a template file if available, otherwise use a regular psi file
     return BaseRefactoringAction.getElementAtCaret(editor, templateFile ?: psiFile)
 }
 
-fun getExpandSelection(
+/** Check if a text range contains an offset */
+private fun TextRange.contains(offset: Int): Boolean = startOffset <= offset && offset <= endOffset
+
+/** Expands the current selection to include enclosing pairs */
+fun Caret.selectEnclosingTypingPairsExpanding(dataContext: DataContext) {
+
+    getElementAtCaret(dataContext)?.let { element ->
+        selectionRange.let { currentSelection ->
+            expandSelection(element, currentSelection, offset)?.also { newRange ->
+                setSelection(newRange.startOffset, newRange.endOffset)
+            }
+        }
+    }
+}
+
+/** Shrinks the current selection if bounded by matching pairs */
+fun Caret.selectEnclosingTypingPairsShrinking(dataContext: DataContext, editor: Editor) {
+
+    if (selectionRange.isEmpty) return
+
+    getElementAtCaret(dataContext)?.let { element ->
+        val currentSelection = selectionRange
+
+        // First try direct check for matching pairs using the editor
+        checkSelectionForMatchingPair(editor, currentSelection)?.also { matchingPairRange ->
+            setSelection(matchingPairRange.startOffset, matchingPairRange.endOffset)
+            return
+        }
+
+        // If that fails, try to shrink using the element tree
+        shrinkSelection(element, currentSelection, offset)?.also { newRange ->
+            setSelection(newRange.startOffset, newRange.endOffset)
+        }
+    }
+}
+
+/** Handle expanding selection */
+private fun expandSelection(
     element: PsiElement,
     currentSelection: TextRange,
     caretOffset: Int,
 ): TextRange? {
-    // if element has no children and end of current selection is not the start of the element,
-    // attempt to get selection from element
+    // Handle elements with no children for expanding
     if (
-        element.children.none() &&
+        element.children.isEmpty() &&
             !currentSelection.contains(element.textRange) &&
-            currentSelection.endOffset > element.textRange.startOffset &&
-            currentSelection.startOffset < element.textRange.endOffset
+            element.textRange.let {
+                currentSelection.endOffset > it.startOffset &&
+                    currentSelection.startOffset < it.endOffset
+            }
     ) {
-        handleNoChildrenExpanding(element, currentSelection)?.let {
+        handleElementSelection(element, currentSelection, true)?.let {
             return it
         }
     }
 
-    return getParentSelection(element.parent ?: return null, currentSelection, caretOffset)
+    return element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
 }
 
-fun handleNoChildrenExpanding(element: PsiElement, currentSelection: TextRange): TextRange? {
-    val elementText = element.text
-
-    if (elementText.length < PairConstants.MINIMUM_SELECTION_SIZE) {
-        return null
+/** Handle shrinking selection */
+private fun shrinkSelection(
+    element: PsiElement,
+    currentSelection: TextRange,
+    caretOffset: Int,
+): TextRange? =
+    getCurrentElement(element, currentSelection)?.let {
+        walkElementTreeShrinking(it, currentSelection, caretOffset)
     }
 
-    val firstChar = elementText.first()
-    val lastChar = elementText.last()
+/** Check if we should skip this element during expansion */
+private fun shouldSkipElement(
+    elementRange: TextRange,
+    currentSelection: TextRange,
+    caretOffset: Int,
+): Boolean {
+    // Skip if element range is exactly the same as current selection
+    if (elementRange == currentSelection) return true
 
+    // Skip if element is completely contained within the current selection
     if (
-        lastChar !in PairConstants.MATCHED_PAIRS.keys ||
-            PairConstants.MATCHED_PAIRS[lastChar] != firstChar
+        elementRange.startOffset >= currentSelection.startOffset &&
+            elementRange.endOffset <= currentSelection.endOffset
     )
-        return null
+        return true
 
-    val fullPairRange = element.textRange
+    // Skip if element starts or ends exactly at caret position
+    if (elementRange.startOffset == caretOffset || elementRange.endOffset == caretOffset)
+        return true
 
-    // if active selection is same as full pair range, return null
-    if (currentSelection == fullPairRange) return null
-
-    return determineNextSelectionRange(currentSelection, fullPairRange)
+    return false
 }
 
-fun determineNextSelectionRange(currentSelection: TextRange, fullPairRange: TextRange): TextRange {
-    val innerContent = TextRange.create(fullPairRange.startOffset + 1, fullPairRange.endOffset - 1)
-
-    return if (currentSelection == innerContent) {
-        fullPairRange
-    } else {
-        innerContent
-    }
-}
-
-tailrec fun getParentSelection(
+/** Walk up element tree for expansion */
+private fun walkElementTreeExpanding(
     element: PsiElement,
     currentSelection: TextRange,
     caretOffset: Int,
 ): TextRange? {
-    element.firstChild?.let { child ->
-        if (child.node?.elementType.toString() == "FILE") return null
-    }
+    // Stop at file level
+    element.firstChild?.let { if (it.node?.elementType.toString() == "FILE") return null }
 
-    val elementTextRange = element.textRange
-
-    if (
-        elementTextRange == null ||
-            elementTextRange == currentSelection ||
-            (elementTextRange.startOffset >= currentSelection.startOffset &&
-                elementTextRange.endOffset <= currentSelection.endOffset) ||
-            elementTextRange.startOffset == caretOffset ||
-            elementTextRange.endOffset == caretOffset
-    )
-        return getParentSelection(element.parent ?: return null, currentSelection, caretOffset)
-
-    // Check if the element has at least two children
-    val children = element.node.getChildren(null)
-
-    if (children.size < 2)
-        return getParentSelection(element.parent ?: return null, currentSelection, caretOffset)
-
-    val firstChild = children.first().psi
-    val lastChild = children.last().psi
-
-    firstChild.text
-    lastChild.text
-
-    // Get the first and last characters from the children
-    val firstChar = if (firstChild.textLength == 1) firstChild.text.first() else null
-    val lastChar = if (lastChild.textLength == 1) lastChild.text.first() else null
-
-    if (firstChar == null && lastChar == null)
-        return getParentSelection(element.parent ?: return null, currentSelection, caretOffset)
-
-    // Perfect match case - existing functionality
-    if (
-        firstChar in PairConstants.MATCHED_PAIRS &&
-            lastChar == PairConstants.MATCHED_PAIRS[firstChar]
-    ) {
-        // Check if the last character is the matching value for the first character
-        if (element.textRange == currentSelection)
-            return getParentSelection(element.parent ?: return null, currentSelection, caretOffset)
-
-        return determineNextSelectionRange(currentSelection, element.textRange)
-    }
-
-    // New functionality - first letter matches but last doesn't
-    if (
-        firstChar in PairConstants.MATCHED_PAIRS &&
-            (lastChar != PairConstants.MATCHED_PAIRS[firstChar])
-    ) {
-
-        // Start with the last child and move to previous siblings
-        var currentElement = lastChild
-        var previousSibling = lastChild.prevSibling
-
-        while (previousSibling != null) {
-            val prevChar =
-                if (previousSibling.textLength == 1) previousSibling.text.firstOrNull() else null
-
-            // If we found a match, create a new text range and determine the next selection
-            if (prevChar == PairConstants.MATCHED_PAIRS[firstChar]) {
-                val newRange =
-                    TextRange.create(
-                        firstChild.textRange.startOffset,
-                        previousSibling.textRange.endOffset,
-                    )
-
-                if (currentSelection == newRange)
-                    return getParentSelection(
-                        element.parent ?: return null,
-                        currentSelection,
-                        caretOffset,
-                    )
-
-                return determineNextSelectionRange(currentSelection, newRange)
+    val elementRange =
+        element.textRange
+            ?: return element.parent?.let {
+                walkElementTreeExpanding(it, currentSelection, caretOffset)
             }
 
-            currentElement = previousSibling
-            previousSibling = currentElement.prevSibling
-        }
+    // Skip this element if it doesn't provide a useful selection
+    if (shouldSkipElement(elementRange, currentSelection, caretOffset)) {
+        return element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
     }
 
-    // New functionality - last letter matches but first doesn't
-    val matchingFirstChars = PairConstants.MATCHED_PAIRS.filterValues { it == lastChar }.keys
-    if (lastChar != null && matchingFirstChars.isNotEmpty() && (firstChar !in matchingFirstChars)) {
-
-        // Start with the first child and move to next siblings
-        var currentElement = firstChild
-        var nextSibling = firstChild.nextSibling
-
-        while (nextSibling != null) {
-            val nextChar = if (nextSibling.textLength == 1) nextSibling.text.firstOrNull() else null
-
-            // If we found a match, create a new text range and determine the next selection
-            if (nextChar in matchingFirstChars) {
-                val newRange =
-                    TextRange.create(
-                        nextSibling.textRange.startOffset,
-                        lastChild.textRange.endOffset,
-                    )
-
-                if (currentSelection == newRange)
-                    return getParentSelection(
-                        element.parent ?: return null,
-                        currentSelection,
-                        caretOffset,
-                    )
-
-                return determineNextSelectionRange(currentSelection, newRange)
-            }
-
-            currentElement = nextSibling
-            nextSibling = currentElement.nextSibling
-        }
-    }
-
-    // Recursively check the parent element
-    return getParentSelection(element.parent ?: return null, currentSelection, caretOffset)
+    // Process element with children
+    return processElementForPairs(element, currentSelection, caretOffset, true)
 }
 
-fun checkSelectionForMatchingPair(editor: Editor, selection: TextRange): TextRange? {
-    // Ensure the selection has at least 2 characters
-    if (selection.length < PairConstants.MINIMUM_SELECTION_SIZE) {
-        return null
+/** Walk down element tree for shrinking */
+private fun walkElementTreeShrinking(
+    element: PsiElement,
+    currentSelection: TextRange,
+    caretOffset: Int,
+): TextRange? =
+    element.children.firstNotNullOfOrNull { child ->
+        when {
+            !child.textRange.contains(caretOffset) -> null // Skip this child
+            child.children.isEmpty() -> handleElementSelection(child, currentSelection, false)
+            else ->
+                processElementForPairs(child, currentSelection, caretOffset, false)
+                    ?: walkElementTreeShrinking(child, currentSelection, caretOffset)
+        }
     }
+        // If no suitable match found in any child, fallback to zero-width selection at caret
+        ?: TextRange.create(caretOffset, caretOffset)
+
+/** Process element for pairs, broken down into smaller functions */
+private fun processElementForPairs(
+    element: PsiElement,
+    currentSelection: TextRange,
+    caretOffset: Int,
+    isExpanding: Boolean,
+): TextRange? =
+    element.node.getChildren(null).let { children ->
+        when {
+            children.size < 2 ->
+                handleInsufficientChildren(element, currentSelection, caretOffset, isExpanding)
+            else ->
+                processPairElements(
+                    children.first().psi,
+                    children.last().psi,
+                    element,
+                    currentSelection,
+                    caretOffset,
+                    isExpanding,
+                )
+        }
+    }
+
+/** Handle case where element has insufficient children */
+private fun handleInsufficientChildren(
+    element: PsiElement,
+    currentSelection: TextRange,
+    caretOffset: Int,
+    isExpanding: Boolean,
+): TextRange? =
+    when {
+        isExpanding ->
+            element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
+        else -> null
+    }
+
+/** Process first and last element children for pair matching */
+private fun processPairElements(
+    firstChild: PsiElement,
+    lastChild: PsiElement,
+    element: PsiElement,
+    currentSelection: TextRange,
+    caretOffset: Int,
+    isExpanding: Boolean,
+): TextRange? {
+    // Extract characters if possible
+    val firstChar = firstChild.takeIf { it.textLength == 1 }?.text?.firstOrNull()
+    val lastChar = lastChild.takeIf { it.textLength == 1 }?.text?.firstOrNull()
+
+    if (firstChar == null && lastChar == null) {
+        return when {
+            isExpanding ->
+                element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
+            else -> null
+        }
+    }
+
+    // Perfect matching pair case
+    if (PairConstants.isValidPair(firstChar ?: Char.MIN_VALUE, lastChar ?: Char.MIN_VALUE)) {
+        val pairRange = element.textRange
+        if (pairRange == currentSelection) {
+            return when {
+                isExpanding ->
+                    element.parent?.let {
+                        walkElementTreeExpanding(it, currentSelection, caretOffset)
+                    }
+                else -> null
+            }
+        }
+
+        return processPair(PairResult.Valid(pairRange), currentSelection, isExpanding)
+    }
+
+    // Try to find partial pairs
+    return findPartialPair(
+        firstChild,
+        lastChild,
+        firstChar,
+        lastChar,
+        currentSelection,
+        caretOffset,
+        isExpanding,
+        element,
+    )
+}
+
+/** Find partial pair matches (opening at start or closing at end) */
+private fun findPartialPair(
+    firstChild: PsiElement,
+    lastChild: PsiElement,
+    firstChar: Char?,
+    lastChar: Char?,
+    currentSelection: TextRange,
+    caretOffset: Int,
+    isExpanding: Boolean,
+    element: PsiElement,
+): TextRange? {
+    // Try both cases with a helper function
+    return findMatchInDirection(
+        // Case 1: Opening at start, find matching closing
+        startChar = firstChar,
+        isStartCharValid = { PairConstants.isOpeningChar(it) },
+        getMatchingChar = { PairConstants.getMatchingClosingChar(it) },
+        startElement = lastChild,
+        siblingFn = { it.prevSibling },
+        createRange = { match ->
+            TextRange.create(firstChild.textRange.startOffset, match.textRange.endOffset)
+        },
+        element,
+        currentSelection,
+        caretOffset,
+        isExpanding,
+    )
+        ?: findMatchInDirection(
+            // Case 2: Closing at end, find matching opening
+            startChar = lastChar,
+            isStartCharValid = { PairConstants.isClosingChar(it) },
+            getMatchingChar = { PairConstants.getMatchingOpeningChar(it) },
+            startElement = firstChild,
+            siblingFn = { it.nextSibling },
+            createRange = { match ->
+                TextRange.create(match.textRange.startOffset, lastChild.textRange.endOffset)
+            },
+            element,
+            currentSelection,
+            caretOffset,
+            isExpanding,
+        )
+        ?: when {
+            // No match found, continue with parent if expanding
+            isExpanding ->
+                element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
+            else -> null
+        }
+}
+
+/** Improved function to find matching direction using sequences */
+private fun findMatchInDirection(
+    startChar: Char?,
+    isStartCharValid: (Char) -> Boolean,
+    getMatchingChar: (Char) -> Char?,
+    startElement: PsiElement,
+    siblingFn: (PsiElement) -> PsiElement?,
+    createRange: (PsiElement) -> TextRange,
+    element: PsiElement,
+    currentSelection: TextRange,
+    caretOffset: Int,
+    isExpanding: Boolean,
+): TextRange? {
+    // Skip if the starting character isn't valid
+    if (startChar == null || !isStartCharValid(startChar)) return null
+
+    // Find the matching character
+    val matchingChar = getMatchingChar(startChar)
+
+    // Use sequence for better lazy evaluation
+    val matchElement =
+        generateSequence(siblingFn(startElement)) { siblingFn(it) }
+            .find { it.textLength == 1 && it.text.firstOrNull() == matchingChar } ?: return null
+
+    // Create the pair range
+    val pairRange = createRange(matchElement)
+
+    // Handle the case where the selection already matches the pair
+    if (pairRange == currentSelection)
+        return when {
+            isExpanding ->
+                element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
+            else -> null
+        }
+
+    // Process the valid pair
+    return processPair(PairResult.Valid(pairRange), currentSelection, isExpanding)
+}
+
+/** Check if selection is bordered by matching pair characters */
+fun checkSelectionForMatchingPair(editor: Editor, selection: TextRange): TextRange? {
+    if (selection.length < PairConstants.MINIMUM_SELECTION_SIZE) return null
 
     val content = editor.document.immutableCharSequence
     val firstChar = content[selection.startOffset]
     val lastChar = content[selection.endOffset - 1]
 
     return when {
-        firstChar in PairConstants.MATCHED_PAIRS &&
-            lastChar == PairConstants.MATCHED_PAIRS[firstChar] ->
-            TextRange.create(selection.startOffset + 1, selection.endOffset - 1)
+        PairConstants.isValidPair(firstChar, lastChar) -> selection.inner()
         else -> null
     }
 }
 
-fun getShrinkSelection(
-    element: PsiElement,
-    editor: Editor,
-    currentSelection: TextRange,
-    caretOffset: Int,
-): TextRange? {
-    return getCurrentElement(element, currentSelection)?.let {
-        checkSelectionForMatchingPair(editor, currentSelection)
-            ?: walkElementsShrinking(it, currentSelection, caretOffset)
-    }
-}
-
+/** Find the element containing a selection */
 tailrec fun getCurrentElement(element: PsiElement, currentSelection: TextRange): PsiElement? =
     when {
         element.textRange.contains(currentSelection) -> element
         element.parent != null -> getCurrentElement(element.parent, currentSelection)
         else -> null
     }
-
-tailrec fun walkElementsShrinking(
-    element: PsiElement,
-    currentSelection: TextRange,
-    caretOffset: Int,
-): TextRange? {
-    element.children.forEach { child ->
-        if (!child.textRange.contains(caretOffset)) return@forEach
-
-        if (child.children.none()) return handleNoChildrenShrinking(child, currentSelection)
-
-        val children = child.node.getChildren(null)
-        if (children.size < 2) return walkElementsShrinking(child, currentSelection, caretOffset)
-
-        val firstChild = children.first().psi
-        val lastChild = children.last().psi
-
-        // Get the first and last characters from the children
-        val firstChar = if (firstChild.textLength == 1) firstChild.text.first() else null
-        val lastChar = if (lastChild.textLength == 1) lastChild.text.first() else null
-
-        if (firstChar == null && lastChar == null)
-            return walkElementsShrinking(child, currentSelection, caretOffset)
-
-        // Perfect match case - existing functionality
-        if (
-            firstChar in PairConstants.MATCHED_PAIRS &&
-                lastChar == PairConstants.MATCHED_PAIRS[firstChar]
-        ) {
-            if (child.textRange == currentSelection)
-                return walkElementsShrinking(child, currentSelection, caretOffset)
-            return child.textRange
-        }
-
-        // New functionality - first letter matches but last doesn't
-        if (
-            firstChar in PairConstants.MATCHED_PAIRS &&
-                (lastChar != PairConstants.MATCHED_PAIRS[firstChar])
-        ) {
-
-            // Start with the last child and move to previous siblings
-            var currentElement = lastChild
-            var previousSibling = lastChild.prevSibling
-
-            while (previousSibling != null) {
-                val prevChar =
-                    if (previousSibling.textLength == 1) previousSibling.text.first() else null
-
-                // If we found a match, return the range from firstChild to previousSibling
-                if (prevChar == PairConstants.MATCHED_PAIRS[firstChar]) {
-                    return TextRange.create(
-                        firstChild.textRange.startOffset,
-                        previousSibling.textRange.endOffset,
-                    )
-                }
-
-                currentElement = previousSibling
-                previousSibling = currentElement.prevSibling
-            }
-
-            // No match found, continue recursion
-            return walkElementsShrinking(child, currentSelection, caretOffset)
-        }
-
-        // New functionality - last letter matches but first doesn't
-        val matchingFirstChars = PairConstants.MATCHED_PAIRS.filterValues { it == lastChar }.keys
-        if (matchingFirstChars.isNotEmpty() && (firstChar !in matchingFirstChars)) {
-
-            // Start with the first child and move to next siblings
-            var currentElement = firstChild
-            var nextSibling = firstChild.nextSibling
-
-            while (nextSibling != null) {
-                val nextChar = if (nextSibling.textLength == 1) nextSibling.text.first() else null
-
-                // If we found a match, return the range from nextSibling to lastChild
-                if (nextChar in matchingFirstChars) {
-                    return TextRange.create(
-                        nextSibling.textRange.startOffset,
-                        lastChild.textRange.endOffset,
-                    )
-                }
-
-                currentElement = nextSibling
-                nextSibling = currentElement.nextSibling
-            }
-
-            // No match found, continue recursion
-            return walkElementsShrinking(child, currentSelection, caretOffset)
-        }
-
-        return walkElementsShrinking(child, currentSelection, caretOffset)
-    }
-
-    // return null
-    return TextRange.create(caretOffset, caretOffset)
-}
-
-fun handleNoChildrenShrinking(element: PsiElement, currentSelection: TextRange): TextRange? {
-    val elementText = element.text
-
-    if (elementText.length < PairConstants.MINIMUM_SELECTION_SIZE) {
-        return null
-    }
-
-    val firstChar = elementText.first()
-    val lastChar = elementText.last()
-
-    if (
-        lastChar !in PairConstants.MATCHED_PAIRS.keys ||
-            PairConstants.MATCHED_PAIRS[lastChar] != firstChar
-    )
-        return null
-
-    val fullPairRange = element.textRange
-
-    // if active selection is same as full pair range, return null
-    if (currentSelection == fullPairRange) return null
-
-    val innerContent = TextRange.create(fullPairRange.startOffset + 1, fullPairRange.endOffset - 1)
-
-    return if (currentSelection == innerContent) {
-        innerContent
-    } else {
-        fullPairRange
-    }
-}
