@@ -1245,4 +1245,37 @@ class SelectPairContentTest : BasePlatformTestCase() {
                 .trimIndent()
         )
     }
+
+    fun `test kotlin code with with statement`() {
+        myFixture.configureByText(
+            KotlinFileType.INSTANCE,
+            """
+        fun processValue(value: Int) {
+            val result = when (value) {
+                1 -> "One"
+                2 -> "Two"<caret>
+                3 -> "Three"
+                else -> "Unknown"
+            }
+        }
+        """
+                .trimIndent(),
+        )
+
+        myFixture.expand()
+
+        myFixture.checkResult(
+            """
+        fun processValue(value: Int) {
+            val result = when (value) {<selection>
+                1 -> "One"
+                2 -> "Two"<caret>
+                3 -> "Three"
+                else -> "Unknown"
+            </selection>}
+        }
+        """
+                .trimIndent()
+        )
+    }
 }
