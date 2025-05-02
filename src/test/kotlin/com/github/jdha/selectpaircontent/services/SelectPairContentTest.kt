@@ -1,5 +1,6 @@
 package com.github.jdha.selectpaircontent.services
 
+import com.goide.GoFileType
 import com.intellij.json.JsonFileType
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.testFramework.TestDataPath
@@ -1154,64 +1155,94 @@ class SelectPairContentTest : BasePlatformTestCase() {
         )
     }
 
-    // fun `test go file with caret in map definition`() {
-    //     myFixture.configureByText(
-    //         GoFileType.INSTANCE,
-    //         """
-    //         package main
-    //
-    //         type ClientContext struct {
-    //             Client ClientApplication
-    //             Env    map[str<caret>ing]string `json:"env"`
-    //             Custom map[string]string `json:"custom"`
-    //         }
-    //         """
-    //             .trimIndent(),
-    //     )
-    //
-    //     myFixture.expand()
-    //
-    //     myFixture.checkResult(
-    //         """
-    //         package main
-    //
-    //         type ClientContext struct {
-    //             Client ClientApplication
-    //             Env    map[<selection>str<caret>ing</selection>]string `json:"env"`
-    //             Custom map[string]string `json:"custom"`
-    //         }
-    //         """
-    //             .trimIndent()
-    //     )
-    //
-    //     myFixture.expand()
-    //
-    //     myFixture.checkResult(
-    //         """
-    //         package main
-    //
-    //         type ClientContext struct {<selection>
-    //             Client ClientApplication
-    //             Env    map[str<caret>ing]string `json:"env"`
-    //             Custom map[string]string `json:"custom"`
-    //         </selection>}
-    //         """
-    //             .trimIndent()
-    //     )
-    //
-    //     myFixture.shrink()
-    //
-    //     myFixture.checkResult(
-    //         """
-    //         package main
-    //
-    //         type ClientContext struct {
-    //             Client ClientApplication
-    //             Env    map[<selection>str<caret>ing</selection>]string `json:"env"`
-    //             Custom map[string]string `json:"custom"`
-    //         }
-    //         """
-    //             .trimIndent()
-    //     )
-    // }
+    fun `test go file with caret in map definition`() {
+        myFixture.configureByText(
+            GoFileType.INSTANCE,
+            """
+            package main
+
+            type ClientContext struct {
+                Client ClientApplication
+                Env    map[str<caret>ing]string `json:"env"`
+                Custom map[string]string `json:"custom"`
+            }
+            """
+                .trimIndent(),
+        )
+
+        myFixture.expand()
+
+        myFixture.checkResult(
+            """
+            package main
+
+            type ClientContext struct {
+                Client ClientApplication
+                Env    map[<selection>str<caret>ing</selection>]string `json:"env"`
+                Custom map[string]string `json:"custom"`
+            }
+            """
+                .trimIndent()
+        )
+
+        myFixture.expand()
+
+        myFixture.checkResult(
+            """
+            package main
+
+            type ClientContext struct {
+                Client ClientApplication
+                Env    map<selection>[str<caret>ing]</selection>string `json:"env"`
+                Custom map[string]string `json:"custom"`
+            }
+            """
+                .trimIndent()
+        )
+
+        myFixture.expand()
+
+        myFixture.checkResult(
+            """
+            package main
+
+            type ClientContext struct {<selection>
+                Client ClientApplication
+                Env    map[str<caret>ing]string `json:"env"`
+                Custom map[string]string `json:"custom"`
+            </selection>}
+            """
+                .trimIndent()
+        )
+
+        myFixture.shrink()
+
+        myFixture.checkResult(
+            """
+            package main
+
+            type ClientContext struct {
+                Client ClientApplication
+                Env    map<selection>[str<caret>ing]</selection>string `json:"env"`
+                Custom map[string]string `json:"custom"`
+            }
+            """
+                .trimIndent()
+        )
+
+        myFixture.shrink()
+
+        myFixture.checkResult(
+            """
+            package main
+
+            type ClientContext struct {
+                Client ClientApplication
+                Env    map[<selection>str<caret>ing</selection>]string `json:"env"`
+                Custom map[string]string `json:"custom"`
+            }
+            """
+                .trimIndent()
+        )
+    }
 }

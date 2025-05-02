@@ -279,7 +279,7 @@ private fun handleInsufficientChildren(
         else -> null
     }
 
-/** Process first and last element children for pair matching */
+/** Process element children for pair matching by walking from first to current element */
 private fun processPairElements(
     firstChild: PsiElement,
     lastChild: PsiElement,
@@ -288,20 +288,73 @@ private fun processPairElements(
     caretOffset: Int,
     isExpanding: Boolean,
 ): TextRange? {
-    // Extract characters if possible
+    // Get all children
+    val children = generateSequence(firstChild) { it.nextSibling }.toList()
+
+    // Find the child that contains the caret or is closest to it
+    val caretChild =
+        children.find { it.textRange.contains(caretOffset) }
+            ?: children.lastOrNull { it.textRange.endOffset <= caretOffset }
+            ?: children.firstOrNull { it.textRange.startOffset >= caretOffset }
+            ?: firstChild
+
+    // Index of the child containing the caret
+    val caretIndex = children.indexOf(caretChild)
+
+    // Find matching pairs from first to caret child
+    val matchingPair =
+        children
+            .take(caretIndex + 1)
+            .asSequence()
+            .mapNotNull { child ->
+                // Check if this child has size 1 and is an opening part of a pair
+                val char =
+                    child.takeIf { it.textLength == 1 }?.text?.firstOrNull()
+                        ?: return@mapNotNull null
+                if (!PairConstants.isOpeningChar(char)) return@mapNotNull null
+
+                val matchingChar =
+                    PairConstants.getMatchingClosingChar(char) ?: return@mapNotNull null
+
+                // Find matching closing pair from the end back towards the caret
+                val endChild =
+                    children.asReversed().take(children.size - caretIndex).find { endChild ->
+                        endChild.takeIf { it.textLength == 1 }?.text?.firstOrNull() == matchingChar
+                    } ?: return@mapNotNull null
+
+                // Create pair range
+                val pairRange =
+                    TextRange.create(child.textRange.startOffset, endChild.textRange.endOffset)
+
+                // Return the pair if found
+                Pair(pairRange, child to endChild)
+            }
+            .firstOrNull()
+
+    // Process the matching pair if found
+    if (matchingPair != null) {
+        val (pairRange, _) = matchingPair
+
+        // Handle the case where the selection already matches the pair
+        if (pairRange == currentSelection) {
+            return when {
+                isExpanding ->
+                    element.parent?.let {
+                        walkElementTreeExpanding(it, currentSelection, caretOffset)
+                    }
+                else -> null
+            }
+        }
+
+        // Process the valid pair
+        return processPair(PairResult.Valid(pairRange), currentSelection, isExpanding)
+    }
+
+    // Perfect matching pair case - check first and last as a fallback
     val firstChar = firstChild.takeIf { it.textLength == 1 }?.text?.firstOrNull()
     val lastChar = lastChild.takeIf { it.textLength == 1 }?.text?.firstOrNull()
 
-    if (firstChar == null && lastChar == null) {
-        return when {
-            isExpanding ->
-                element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
-            else -> null
-        }
-    }
-
-    // Perfect matching pair case
-    if (PairConstants.isValidPair(firstChar ?: Char.MIN_VALUE, lastChar ?: Char.MIN_VALUE)) {
+    if (firstChar != null && lastChar != null && PairConstants.isValidPair(firstChar, lastChar)) {
         val pairRange = element.textRange
         if (pairRange == currentSelection) {
             return when {
@@ -316,75 +369,6 @@ private fun processPairElements(
         return processPair(PairResult.Valid(pairRange), currentSelection, isExpanding)
     }
 
-    // Try to find partial pairs - inlined from findPartialPair and findMatchInDirection
-
-    // Case 1: Opening at start, find matching closing
-
-    // Skip if the starting character isn't valid
-    if (firstChar != null && PairConstants.isOpeningChar(firstChar)) {
-        val startChar = firstChar
-        // Find the matching character
-        val matchingChar = PairConstants.getMatchingClosingChar(startChar)
-
-        // Use sequence for better lazy evaluation
-        val matchElement =
-            generateSequence(lastChild.prevSibling) { it.prevSibling }
-                .find { it.textLength == 1 && it.text.firstOrNull() == matchingChar }
-
-        if (matchElement != null) {
-            // Create the pair range
-            val pairRange =
-                TextRange.create(firstChild.textRange.startOffset, matchElement.textRange.endOffset)
-
-            // Handle the case where the selection already matches the pair
-            if (pairRange == currentSelection) {
-                return when {
-                    isExpanding ->
-                        element.parent?.let {
-                            walkElementTreeExpanding(it, currentSelection, caretOffset)
-                        }
-                    else -> null
-                }
-            }
-
-            // Process the valid pair
-            return processPair(PairResult.Valid(pairRange), currentSelection, isExpanding)
-        }
-    }
-
-    // Case 2: Closing at end, find matching opening
-    // Skip if the starting character isn't valid
-    if (lastChar != null && PairConstants.isClosingChar(lastChar)) {
-        val startChar = lastChar
-        // Find the matching character
-        val matchingChar = PairConstants.getMatchingOpeningChar(startChar)
-
-        // Use sequence for better lazy evaluation
-        val matchElement =
-            generateSequence(firstChild.nextSibling) { it.nextSibling }
-                .find { it.textLength == 1 && it.text.firstOrNull() == matchingChar }
-
-        if (matchElement != null) {
-            // Create the pair range
-            val pairRange =
-                TextRange.create(matchElement.textRange.startOffset, lastChild.textRange.endOffset)
-
-            // Handle the case where the selection already matches the pair
-            if (pairRange == currentSelection) {
-                return when {
-                    isExpanding ->
-                        element.parent?.let {
-                            walkElementTreeExpanding(it, currentSelection, caretOffset)
-                        }
-                    else -> null
-                }
-            }
-
-            // Process the valid pair
-            return processPair(PairResult.Valid(pairRange), currentSelection, isExpanding)
-        }
-    }
-
     // No match found, continue with parent if expanding
     return when {
         isExpanding ->
@@ -392,8 +376,6 @@ private fun processPairElements(
         else -> null
     }
 }
-
-// These functions have been inlined into processPairElements
 
 /** Check if selection is bordered by matching pair characters */
 fun checkSelectionForMatchingPair(editor: Editor, selection: TextRange): TextRange? {
