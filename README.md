@@ -20,6 +20,13 @@ The plugin offers two main operations:
 
 This makes it easier to manipulate code blocks, string contents, and other paired structures without
 manually positioning your cursor.
+
+### Keyboard Shortcuts
+
+- `Alt+A` (Windows/Linux) or `Option+A` (Mac): Select content between matching pairs (expand) -
+  press repeatedly to expand to outer pairs
+- `Shift+Alt+A` (Windows/Linux) or `Shift+Option+A` (Mac): Reverse the previous pair selection
+
 <!-- Plugin description end -->
 
 ## Features
@@ -39,12 +46,6 @@ manually positioning your cursor.
 - Works with nested pairs
 
 ## Usage
-
-### Keyboard Shortcuts
-
-- `Alt+A` (Windows/Linux) or `Option+A` (Mac): Select content between matching pairs (expand) -
-  press repeatedly to expand to outer pairs
-- `Shift+Alt+A` (Windows/Linux) or `Shift+Option+A` (Mac): Reverse the previous pair selection
 
 ### Examples
 
