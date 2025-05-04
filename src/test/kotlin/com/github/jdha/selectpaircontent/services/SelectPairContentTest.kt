@@ -1278,4 +1278,29 @@ class SelectPairContentTest : BasePlatformTestCase() {
                 .trimIndent()
         )
     }
+
+    fun `test caret outside normal bounds but still in side pair`() {
+        myFixture.configureByText(
+            KotlinFileType.INSTANCE,
+            """
+                class Temp(val age: Int) {
+                <caret>
+                    override fun toString(): String = age.toString()
+                }
+                """
+                .trimIndent(),
+        )
+
+        myFixture.expand()
+
+        myFixture.checkResult(
+            """
+                class Temp(val age: Int) {<selection>
+                <caret>
+                    override fun toString(): String = age.toString()
+                </selection>}
+                """
+                .trimIndent()
+        )
+    }
 }

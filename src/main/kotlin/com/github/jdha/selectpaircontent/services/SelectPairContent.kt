@@ -1,13 +1,11 @@
 package com.github.jdha.selectpaircontent.services
 
-import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.github.jdha.selectpaircontent.utils.getElementAtCaret
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.editor.Caret
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
-import com.intellij.psi.util.PsiUtilCore
-import com.intellij.refactoring.actions.BaseRefactoringAction
 import kotlin.collections.contains
 
 /** Expands the current selection to include enclosing pairs */
@@ -134,15 +132,6 @@ private fun String.getPair(
         }
     }
 
-/** Get PSI element at caret position */
-fun getElementAtCaret(dataContext: DataContext): PsiElement? {
-    val editor = CommonDataKeys.EDITOR.getData(dataContext) ?: return null
-    val psiFile = CommonDataKeys.PSI_FILE.getData(dataContext) ?: return null
-    val templateFile = PsiUtilCore.getTemplateLanguageFile(psiFile)
-
-    return BaseRefactoringAction.getElementAtCaret(editor, templateFile ?: psiFile)
-}
-
 /** Handle expanding selection */
 private fun expandSelection(
     element: PsiElement,
@@ -268,7 +257,15 @@ private fun processPairElements(
     val children = generateSequence(element.firstChild) { it.nextSibling }.toList()
 
     // Find the child that contains the caret or is closest to it
-    val caretChild = children.find { it.textRange.contains(caretOffset) } ?: return null
+    val caretChild =
+        children.find { it.textRange.contains(caretOffset) }
+            ?: children.minByOrNull {
+                // If caret is before element, calculate distance from start
+                if (caretOffset > it.textRange.endOffset) caretOffset - it.textRange.endOffset
+                // If caret is after element, calculate distance from end
+                else it.textRange.startOffset - caretOffset
+            }
+            ?: return null
 
     // Index of the child containing the caret
     val caretIndex = children.indexOf(caretChild)
