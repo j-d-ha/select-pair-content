@@ -11,14 +11,56 @@
     <actions>
         <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentExpandingAction"
                 class="com.github.jdha.selectpaircontent.actions.SelectPairContentExpandingAction"
-                text="Select Pair Content">
-            <keyboard-shortcut keymap="$default" first-keystroke="alt a"/>
+                text="Select Pair Content Expanding">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt q"/>
         </action>
 
         <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
                 class="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
-                text="Select Pair Content Reverse">
+                text="Select Pair Content Shrinking">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt shift q"/>
+        </action>
+
+        <action id="com.github.jdha.selectpaircontent.actions.SelectElementExpandOutAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectElementExpandOutAction"
+                text="Expand Out Element Selection"
+                description="Expand out element selection to include parent element">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt w"/>
+        </action>
+
+        <action id="com.github.jdha.selectpaircontent.actions.SelectElementShrinkDownAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectElementShrinkDownAction"
+                text="Shrink Down Element Selection"
+                description="Shrink out element selection to include parent element">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt s"/>
+        </action>
+
+        <action id="com.github.jdha.selectpaircontent.actions.SelectElementExpandLeftAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectElementExpandLeftAction"
+                text="Expand Left Element Selection"
+                description="Expand element selection to the left">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt a"/>
+        </action>
+
+        <action id="com.github.jdha.selectpaircontent.actions.SelectElementExpandRightAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectElementExpandRightAction"
+                text="Expand Right Element Selection"
+                description="Expand element selection to the right">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt d"/>
+        </action>
+
+        <action id="com.github.jdha.selectpaircontent.actions.SelectElementShrinkLeftAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectElementShrinkLeftAction"
+                text="Shrink Left Element Selection"
+                description="Shrink element selection from the left">
             <keyboard-shortcut keymap="$default" first-keystroke="shift alt a"/>
+        </action>
+
+        <action id="com.github.jdha.selectpaircontent.actions.SelectElementShrinkRightAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectElementShrinkRightAction"
+                text="Shrink Right Element Selection"
+                description="Shrink element selection from the right">
+            <keyboard-shortcut keymap="$default" first-keystroke="shift alt d"/>
         </action>
     </actions>
 

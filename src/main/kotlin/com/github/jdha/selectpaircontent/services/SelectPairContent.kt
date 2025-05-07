@@ -1,5 +1,6 @@
 package com.github.jdha.selectpaircontent.services
 
+import com.github.jdha.selectpaircontent.utils.findElementWithOffset
 import com.github.jdha.selectpaircontent.utils.getElementAtCaret
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.editor.Caret
@@ -257,15 +258,7 @@ private fun processPairElements(
     val children = generateSequence(element.firstChild) { it.nextSibling }.toList()
 
     // Find the child that contains the caret or is closest to it
-    val caretChild =
-        children.find { it.textRange.contains(caretOffset) }
-            ?: children.minByOrNull {
-                // If caret is before element, calculate distance from start
-                if (caretOffset > it.textRange.endOffset) caretOffset - it.textRange.endOffset
-                // If caret is after element, calculate distance from end
-                else it.textRange.startOffset - caretOffset
-            }
-            ?: return null
+    val caretChild = children.findElementWithOffset(caretOffset)
 
     // Index of the child containing the caret
     val caretIndex = children.indexOf(caretChild)
