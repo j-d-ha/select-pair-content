@@ -4,69 +4,43 @@
 [![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 
-## About The Project
+## About The Plugin
 
 <!-- Plugin description -->
-Select Pair Content is a JetBrains IDEA plugin that allows you to quickly select content between
-matching pairs like parentheses `()`,
-brackets `[]`, braces `{}`, quotes `''` `""` `` ` ` ``, and angle brackets `<>`.
+Select Pair Content is a JetBrains IDE plugin that allows you to quickly select content within a
+file. It has two main functions:
 
-The plugin offers two main operations:
+- Selecting content between matching pairs of tokens such as parentheses `()`,
+  brackets `[]`, braces `{}`, quotes `''` `""` `` ` ` ``, and angle brackets `<>`.
+- Select content based on the
+  underlying [PSI Elements](https://plugins.jetbrains.com/docs/intellij/psi.html)
+  that make up a file.
 
-- **Expand Selection** - Select content between the nearest enclosing pair (can be run repeatedly to
-  expand further)
-- **Shrink Selection** - Undo the previous pair selection, returning to the previous selection
-  state
+For both pair and element based selection, the plugin supports expanding a selection and shrinking
+it. Repeated invocations of the plugin action will expand out
+the given selection. Exact behavior is determined by the given action as follows:
 
-This makes it easier to manipulate code blocks, string contents, and other paired structures without
-manually positioning your cursor.
+- **Pair Select**
+    - **Expand**: Repeated expand action invocations will expand out the selection to the next
+      pair of matching tokens.
+    - **Shrink**: Repeated shrink action invocations will shrink the selection to the next pair of
+      matching
+      tokens within the existing selection.
+- **Element Select**
+    - **Expand**: Repeated expand action invocations will select the given element's parent element.
+    - **Shrink**:Repeated shrink action invocations will shrink the selection to the given element's
+      child element that contains the caret.
 
 ### Keyboard Shortcuts
 
-- `Alt+A` (Windows/Linux) or `Option+A` (Mac): Select content between matching pairs (expand) -
-  press repeatedly to expand to outer pairs
-- `Shift+Alt+A` (Windows/Linux) or `Shift+Option+A` (Mac): Reverse the previous pair selection
+| Action                        | Windows/Linux | MacOS      |
+|-------------------------------|---------------|------------|
+| Expand Pair Content Selection | `Alt+Q`       | `Option+Q` |
+| Shrink Pair Content Selection | `Alt+A`       | `Option+A` |
+| Expand Element Selection      | `Alt+W`       | `Option+W` |
+| Shrink Element Selection      | `Alt+S`       | `Option+S` |
 
 <!-- Plugin description end -->
-
-## Features
-
-- Smart selection of content between matching character pairs:
-    - Parentheses: `(content)`
-    - Brackets: `[content]`
-    - Braces: `{content}`
-    - Single quotes: `'content'`
-    - Double quotes: `"content"`
-    - Backticks: `` `content` ``
-    - Angle brackets: `<content>`
-- Two selection modes:
-    - Expand to include content between matching pairs (can be run repeatedly to expand to outer
-      pairs)
-    - Shrink to undo the previous pair selection
-- Works with nested pairs
-
-## Usage
-
-### Examples
-
-#### Expanding Selection
-
-1. Place your cursor inside a pair of characters, e.g., inside `(some content)`
-2. Press **Alt+A** (Windows/Linux) or **Option+A** (Mac) to select the content between the
-   parentheses: `some content`
-3. Press **Alt+A** (Windows/Linux) or **Option+A** (Mac) again to select the entire expression
-   including the parentheses: `(some content)`
-4. For nested structures like `function((arg1), arg2)`, you can continue pressing **Alt+A** (
-   Windows/Linux) or **Option+A** (Mac) to progressively expand to outer pairs
-
-#### Reversing Selection
-
-1. First use **Alt+A** (Windows/Linux) or **Option+A** (Mac) to select content between matching
-   pairs
-2. Press **Shift+Alt+A** (Windows/Linux) or **Shift+Option+A** (Mac) to reverse the selection and
-   return to the previous state
-3. If you've expanded the selection multiple times, you can continue pressing **Shift+Alt+A** (
-   Windows/Linux) or **Shift+Option+A** (Mac) to step back through your selection history
 
 ## Installation
 

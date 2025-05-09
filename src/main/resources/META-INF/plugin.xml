@@ -11,13 +11,13 @@
     <actions>
         <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentExpandingAction"
                 class="com.github.jdha.selectpaircontent.actions.SelectPairContentExpandingAction"
-                text="Select Pair Content Expanding">
+                text="Expand Pair Content Selection">
             <keyboard-shortcut keymap="$default" first-keystroke="alt q"/>
         </action>
 
         <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
                 class="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
-                text="Select Pair Content Shrinking">
+                text="Shrink Pair Content Selection">
             <keyboard-shortcut keymap="$default" first-keystroke="alt a"/>
         </action>
 
