@@ -37,7 +37,7 @@ class SelectElementServiceTest : BasePlatformTestCase() {
         myFixture.checkResult(
             """
                 {
-                  "foo": "<selection>b<caret>ar</selection>"
+                  "foo": <selection>"b<caret>ar"</selection>
                 }
                 """
                 .trimIndent()
