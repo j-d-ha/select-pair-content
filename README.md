@@ -1,8 +1,8 @@
 # Select Pair Content
 
 ![Build](https://github.com/j-d-ha/select-pair-content/workflows/Build/badge.svg)
-[![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
+[![Version](https://img.shields.io/jetbrains/plugin/v/27313.svg)](https://plugins.jetbrains.com/plugin/27313)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/27313.svg)](https://plugins.jetbrains.com/plugin/27313)
 
 ## About The Plugin
 
@@ -52,11 +52,11 @@ the given selection. Exact behavior is determined by the given action as follows
 
 - Using JetBrains Marketplace:
 
-  Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID) and install it
+  Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/27313) and install it
   by clicking the <kbd>Install to ...</kbd> button in case your IDE is running.
 
   You can also download
-  the [latest release](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID/versions) from JetBrains
+  the [latest release](https://plugins.jetbrains.com/plugin/27313/versions) from JetBrains
   Marketplace and install it manually using
   <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from
   disk...</kbd>
