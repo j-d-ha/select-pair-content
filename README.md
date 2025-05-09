@@ -1,51 +1,89 @@
-# select-pair-content
+# Select Pair Content
 
 ![Build](https://github.com/j-d-ha/select-pair-content/workflows/Build/badge.svg)
 [![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 
-## Template ToDo list
-- [x] Create a new [IntelliJ Platform Plugin Template][template] project.
-- [ ] Get familiar with the [template documentation][template].
-- [ ] Adjust the [pluginGroup](./gradle.properties) and [pluginName](./gradle.properties), as well as the [id](./src/main/resources/META-INF/plugin.xml) and [sources package](./src/main/kotlin).
-- [ ] Adjust the plugin description in `README` (see [Tips][docs:plugin-description])
-- [ ] Review the [Legal Agreements](https://plugins.jetbrains.com/docs/marketplace/legal-agreements.html?from=IJPluginTemplate).
-- [ ] [Publish a plugin manually](https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate) for the first time.
-- [ ] Set the `MARKETPLACE_ID` in the above README badges. You can obtain it once the plugin is published to JetBrains Marketplace.
-- [ ] Set the [Plugin Signing](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html?from=IJPluginTemplate) related [secrets](https://github.com/JetBrains/intellij-platform-plugin-template#environment-variables).
-- [ ] Set the [Deployment Token](https://plugins.jetbrains.com/docs/marketplace/plugin-upload.html?from=IJPluginTemplate).
-- [ ] Click the <kbd>Watch</kbd> button on the top of the [IntelliJ Platform Plugin Template][template] to be notified about releases containing new features and fixes.
+## About The Plugin
 
 <!-- Plugin description -->
-This Fancy IntelliJ Platform Plugin is going to be your implementation of the brilliant ideas that you have.
+Select Pair Content is a JetBrains IDE plugin that allows you to quickly select content within a
+file. It has two main functions:
 
-This specific section is a source for the [plugin.xml](/src/main/resources/META-INF/plugin.xml) file which will be extracted by the [Gradle](/build.gradle.kts) during the build process.
+- Selecting content between matching pairs of tokens such as parentheses `()`,
+  brackets `[]`, braces `{}`, quotes `''` `""` `` ` ` ``, and angle brackets `<>`.
+- Select content based on the
+  underlying [PSI Elements](https://plugins.jetbrains.com/docs/intellij/psi.html)
+  that make up a file.
 
-To keep everything working, do not remove `<!-- ... -->` sections. 
+For both pair and element based selection, the plugin supports expanding a selection and shrinking
+it. Repeated invocations of the plugin action will expand out
+the given selection. Exact behavior is determined by the given action as follows:
+
+- **Pair Select**
+    - **Expand**: Repeated expand action invocations will expand out the selection to the next
+      pair of matching tokens.
+    - **Shrink**: Repeated shrink action invocations will shrink the selection to the next pair of
+      matching
+      tokens within the existing selection.
+- **Element Select**
+    - **Expand**: Repeated expand action invocations will select the given element's parent element.
+    - **Shrink**:Repeated shrink action invocations will shrink the selection to the given element's
+      child element that contains the caret.
+
+### Keyboard Shortcuts
+
+| Action                        | Windows/Linux | MacOS      |
+|-------------------------------|---------------|------------|
+| Expand Pair Content Selection | `Alt+Q`       | `Option+Q` |
+| Shrink Pair Content Selection | `Alt+A`       | `Option+A` |
+| Expand Element Selection      | `Alt+W`       | `Option+W` |
+| Shrink Element Selection      | `Alt+S`       | `Option+S` |
+
 <!-- Plugin description end -->
 
 ## Installation
 
 - Using the IDE built-in plugin system:
-  
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > <kbd>Search for "select-pair-content"</kbd> >
+
+  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > <kbd>Search for "
+  Select Pair Content"</kbd> >
   <kbd>Install</kbd>
-  
+
 - Using JetBrains Marketplace:
 
-  Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID) and install it by clicking the <kbd>Install to ...</kbd> button in case your IDE is running.
+  Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID) and install it
+  by clicking the <kbd>Install to ...</kbd> button in case your IDE is running.
 
-  You can also download the [latest release](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID/versions) from JetBrains Marketplace and install it manually using
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
+  You can also download
+  the [latest release](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID/versions) from JetBrains
+  Marketplace and install it manually using
+  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from
+  disk...</kbd>
 
 - Manually:
 
-  Download the [latest release](https://github.com/j-d-ha/select-pair-content/releases/latest) and install it manually using
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
+  Download the [latest release](https://github.com/j-d-ha/select-pair-content/releases/latest) and
+  install it manually using
+  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from
+  disk...</kbd>
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgements
+
+This plugin is based on the [code-buddy-plugin](https://github.com/srizzo/code-buddy-plugin#)
+plugin.
 
 ---
 Plugin based on the [IntelliJ Platform Plugin Template][template].
 
 [template]: https://github.com/JetBrains/intellij-platform-plugin-template
+
 [docs:plugin-description]: https://plugins.jetbrains.com/docs/intellij/plugin-user-experience.html#plugin-description-and-presentation

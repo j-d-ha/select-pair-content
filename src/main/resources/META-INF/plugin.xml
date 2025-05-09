@@ -1,15 +1,37 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
-<idea-plugin>
+<idea-plugin require-restart="true">
     <id>com.github.jdha.selectpaircontent</id>
-    <name>select-pair-content</name>
+    <name>Select Pair Content</name>
     <vendor>j-d-ha</vendor>
 
     <depends>com.intellij.modules.platform</depends>
 
-    <resource-bundle>messages.MyBundle</resource-bundle>
+    <resource-bundle>messages.SelectPairContentBundle</resource-bundle>
 
-    <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.jdha.selectpaircontent.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="com.github.jdha.selectpaircontent.startup.MyProjectActivity" />
-    </extensions>
+    <actions>
+        <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentExpandingAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectPairContentExpandingAction"
+                text="Expand Pair Content Selection">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt q"/>
+        </action>
+
+        <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
+                text="Shrink Pair Content Selection">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt a"/>
+        </action>
+
+        <action id="com.github.jdha.selectpaircontent.actions.SelectElementExpandOutAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectElementExpandOutAction"
+                text="Expand Element Selection">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt w"/>
+        </action>
+
+        <action id="com.github.jdha.selectpaircontent.actions.SelectElementShrinkDownAction"
+                class="com.github.jdha.selectpaircontent.actions.SelectElementShrinkDownAction"
+                text="Shrink Element Selection">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt s"/>
+        </action>
+    </actions>
+
 </idea-plugin>
