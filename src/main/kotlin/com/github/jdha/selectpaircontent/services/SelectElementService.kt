@@ -60,9 +60,11 @@ class SelectElementService {
     // ── Expand Up ────────────────────────────────────────────────────────────────────
 
     private fun PsiElement.expandUp(currentSelection: TextRange): TextRange? =
-        if (this is PsiDirectory) currentSelection
-        else if (this.textRange == currentSelection) parent?.expandUp(currentSelection) ?: textRange
-        else
+        if (this is PsiDirectory) {
+            currentSelection
+        } else if (this.textRange == currentSelection) {
+            parent?.expandUp(currentSelection) ?: textRange
+        } else {
             getWholeElementAtSelection(currentSelection).let { wholeElement ->
                 when {
                     wholeElement.parent !is PsiDirectory &&
@@ -70,30 +72,37 @@ class SelectElementService {
                             currentSelection.contains(wholeElement.textRange)) -> {
                         wholeElement.parent.expandUp(currentSelection)
                     }
+
                     currentSelection.containsInside(wholeElement.textRange) -> {
                         currentSelection
                     }
+
                     else -> {
                         wholeElement.textRange
                     }
                 }
             } ?: textRange
+        }
 
     // ── Shrink Down ──────────────────────────────────────────────────────────────────
 
     private fun PsiElement.shrinkDown(currentSelection: TextRange, caretOffset: Int): TextRange? =
-        if (children.none() && textRange == currentSelection)
+        if (children.none() && textRange == currentSelection) {
             TextRange.create(caretOffset, caretOffset)
-        else
+        } else {
             generateSequence(firstChild) { it.nextSibling }
                 .find { it.textRange.contains(caretOffset) }
                 ?.let {
                     when {
-                        it.textRange == currentSelection ->
+                        it.textRange == currentSelection -> {
                             it.shrinkDown(currentSelection, caretOffset)
-                        else -> it.textRange
+                        }
+                        else -> {
+                            it.textRange
+                        }
                     }
                 }
+        }
 
     //      ╭──────────────────────────────────────────────────────────╮
     //      │                         Helpers                          │
@@ -103,15 +112,12 @@ class SelectElementService {
 
     private tailrec fun PsiElement.getWholeElementAtSelection(
         currentSelection: TextRange
-    ): PsiElement {
+    ): PsiElement =
         if (parent == null) {
-            return this
+            this
+        } else if (textRange?.contains(currentSelection) ?: true) {
+            this
+        } else {
+            parent.getWholeElementAtSelection(currentSelection)
         }
-
-        if (textRange?.contains(currentSelection) ?: true) {
-            return this
-        }
-
-        return parent.getWholeElementAtSelection(currentSelection)
-    }
 }

@@ -25,6 +25,10 @@ fun Iterable<PsiElement>.findElementWithOffset(offset: Int): PsiElement? =
 fun Sequence<PsiElement>.findElementWithOffset(offset: Int): PsiElement? =
     find { it.textRange.contains(offset) } ?: minByOrNull { it.offsetDelta(offset) }
 
+fun Sequence<PsiElement>.findElementIndexWithOffset(offset: Int): Int? =
+    withIndex().find { it.value.textRange.contains(offset) }?.index
+        ?: withIndex().minByOrNull { it.value.offsetDelta(offset) }?.index
+
 private fun PsiElement.offsetDelta(offset: Int): Int =
     // If caret is before element, calculate distance from start
     if (offset > textRange.endOffset) offset - textRange.endOffset

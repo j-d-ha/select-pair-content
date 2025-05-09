@@ -1,5 +1,5 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
-<idea-plugin>
+<idea-plugin require-restart="true">
     <id>com.github.jdha.selectpaircontent</id>
     <name>Select Pair Content</name>
     <vendor>j-d-ha</vendor>
@@ -18,20 +18,18 @@
         <action id="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
                 class="com.github.jdha.selectpaircontent.actions.SelectPairContentShrinkingAction"
                 text="Select Pair Content Shrinking">
-            <keyboard-shortcut keymap="$default" first-keystroke="alt shift q"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="alt a"/>
         </action>
 
         <action id="com.github.jdha.selectpaircontent.actions.SelectElementExpandOutAction"
                 class="com.github.jdha.selectpaircontent.actions.SelectElementExpandOutAction"
-                text="Expand Out Element Selection"
-                description="Expand out element selection to include parent element">
+                text="Expand Element Selection">
             <keyboard-shortcut keymap="$default" first-keystroke="alt w"/>
         </action>
 
         <action id="com.github.jdha.selectpaircontent.actions.SelectElementShrinkDownAction"
                 class="com.github.jdha.selectpaircontent.actions.SelectElementShrinkDownAction"
-                text="Shrink Down Element Selection"
-                description="Shrink out element selection to include parent element">
+                text="Shrink Element Selection">
             <keyboard-shortcut keymap="$default" first-keystroke="alt s"/>
         </action>
     </actions>

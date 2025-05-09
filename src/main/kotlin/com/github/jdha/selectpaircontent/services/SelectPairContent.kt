@@ -7,15 +7,14 @@ import com.intellij.openapi.editor.Caret
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
 import kotlin.collections.contains
 
 /** Expands the current selection to include enclosing pairs */
 fun Caret.selectEnclosingTypingPairsExpanding(dataContext: DataContext) {
     getElementAtCaret(dataContext)?.let { element ->
-        selectionRange.let { currentSelection ->
-            expandSelection(element, currentSelection, offset)?.also { newRange ->
-                setSelection(newRange.startOffset, newRange.endOffset)
-            }
+        expandSelection(element, selectionRange, offset)?.also { newRange ->
+            setSelection(newRange.startOffset, newRange.endOffset)
         }
     }
 }
@@ -28,10 +27,14 @@ fun Caret.selectEnclosingTypingPairsShrinking(dataContext: DataContext, editor: 
         val currentSelection = selectionRange
 
         // First try direct check for matching pairs using the editor
-        checkSelectionTextForPair(editor, currentSelection, false)?.also { matchingPairRange ->
-            setSelection(matchingPairRange.startOffset, matchingPairRange.endOffset)
-            return
-        }
+        editor.document.immutableCharSequence
+            .subSequence(currentSelection.startOffset, currentSelection.endOffset)
+            .toString()
+            .getPair(currentSelection, currentSelection, false)
+            ?.also { matchingPairRange ->
+                setSelection(matchingPairRange.startOffset, matchingPairRange.endOffset)
+                return
+            }
 
         // If that fails, try to shrink using the element tree
         shrinkSelection(element, currentSelection, offset)?.also { newRange ->
@@ -89,8 +92,10 @@ private fun processPair(
         isExpanding && innerContent.contains(currentSelection) && currentSelection.length == 0 ->
             innerContent
         isExpanding && innerContent.containsInside(currentSelection) -> innerContent
+        isExpanding && innerContent.contains(currentSelection) -> innerContent
         isShrinking && currentSelection.containsInside(pairDetail.range) -> pairDetail.range
         isShrinking && currentSelection == pairDetail.range -> innerContent
+        isShrinking && currentSelection.contains(pairDetail.range) -> pairDetail.range
         else -> null
     }
 }
@@ -166,52 +171,39 @@ private fun shrinkSelection(
         walkElementTreeShrinking(it, currentSelection, caretOffset)
     }
 
-/** Check if we should skip this element during expansion */
-private fun shouldSkipElement(
-    elementRange: TextRange,
-    currentSelection: TextRange,
-    caretOffset: Int,
-): Boolean {
-    // Skip if element range is exactly the same as current selection
-    if (elementRange == currentSelection) return true
-
-    // Skip if element is completely contained within the current selection
-    if (
-        elementRange.startOffset >= currentSelection.startOffset &&
-            elementRange.endOffset <= currentSelection.endOffset
-    )
-        return true
-
-    // Skip if element starts or ends exactly at caret position
-    if (elementRange.startOffset == caretOffset || elementRange.endOffset == caretOffset)
-        return true
-
-    return false
-}
+/** Find the element containing a selection */
+tailrec fun getCurrentElement(element: PsiElement, currentSelection: TextRange): PsiElement? =
+    when {
+        element.textRange.contains(currentSelection) -> element
+        element.parent != null -> getCurrentElement(element.parent, currentSelection)
+        else -> null
+    }
 
 /** Walk up element tree for expansion */
 private fun walkElementTreeExpanding(
     element: PsiElement,
     currentSelection: TextRange,
     caretOffset: Int,
-): TextRange? {
-    // Stop at file level
-    element.firstChild?.let { if (it.node?.elementType.toString() == "FILE") return null }
+): TextRange? =
+    when {
+        // Stop at file level
+        element is PsiFile -> null
 
-    val elementRange =
-        element.textRange
-            ?: return element.parent?.let {
-                walkElementTreeExpanding(it, currentSelection, caretOffset)
-            }
+        // Skip if element has no text range
+        element.textRange == null -> null
 
-    // Skip this element if it doesn't provide a useful selection
-    if (shouldSkipElement(elementRange, currentSelection, caretOffset)) {
-        return element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
+        // Skip if element is contained within the current selection
+        currentSelection.contains(element.textRange) ->
+            element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
+
+        // Skip if element starts or ends exactly at caret position
+        element.textRange.startOffset == caretOffset ||
+            element.textRange.endOffset == caretOffset ->
+            element.parent?.let { walkElementTreeExpanding(it, currentSelection, caretOffset) }
+
+        // Process element with children
+        else -> processElementForPairs(element, currentSelection, caretOffset, true)
     }
-
-    // Process element with children
-    return processElementForPairs(element, currentSelection, caretOffset, true)
-}
 
 /** Walk down element tree for shrinking */
 private fun walkElementTreeShrinking(
@@ -254,18 +246,12 @@ private fun processPairElements(
     caretOffset: Int,
     isExpanding: Boolean,
 ): TextRange? {
-    // Get all children
-    val children = generateSequence(element.firstChild) { it.nextSibling }.toList()
-
-    // Find the child that contains the caret or is closest to it
-    val caretChild = children.findElementWithOffset(caretOffset)
-
-    // Index of the child containing the caret
-    val caretIndex = children.indexOf(caretChild)
+    val caretElement =
+        generateSequence(element.firstChild) { it.nextSibling }.findElementWithOffset(caretOffset)
+            ?: return null
 
     // Find matching pairs from first to caret child
-    return children
-        .take(caretIndex + 1)
+    return generateSequence(caretElement) { it.prevSibling }
         .mapNotNull { child ->
             val pairOpen =
                 child
@@ -277,8 +263,7 @@ private fun processPairElements(
 
             // Find matching closing pair from the end back towards the caret
             val endChild =
-                generateSequence(element.lastChild) { it.prevSibling }
-                    .take(children.size - caretIndex)
+                generateSequence(caretElement) { it.nextSibling }
                     .find { child ->
                         child.takeIf { it.textLength == pairClose.length }?.text == pairClose
                     } ?: return@mapNotNull null
@@ -308,22 +293,3 @@ private fun processPairElements(
             else -> null
         }
 }
-
-/** Check if selection is bordered by matching pair characters */
-private fun checkSelectionTextForPair(
-    editor: Editor,
-    selection: TextRange,
-    isExpanding: Boolean,
-): TextRange? =
-    editor.document.immutableCharSequence
-        .subSequence(selection.startOffset, selection.endOffset)
-        .toString()
-        .getPair(selection, selection, isExpanding)
-
-/** Find the element containing a selection */
-tailrec fun getCurrentElement(element: PsiElement, currentSelection: TextRange): PsiElement? =
-    when {
-        element.textRange.contains(currentSelection) -> element
-        element.parent != null -> getCurrentElement(element.parent, currentSelection)
-        else -> null
-    }
