@@ -1,6 +1,5 @@
 import java.io.FileReader
 import java.util.Properties
-import kotlin.apply
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
@@ -24,7 +23,7 @@ plugins {
 
 group = providers.gradleProperty("pluginGroup").get()
 
-version = project.changelog.getAll().keys.toList().first { Regex("""\d+\.\d+\.\d+""").matches(it) }
+version = providers.gradleProperty("pluginVersion").get()
 
 // Set the JVM language level used to build the project.
 kotlin { jvmToolchain(21) }
@@ -42,7 +41,6 @@ repositories {
 // https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
     testImplementation(libs.junit)
-    testImplementation(libs.opentest4j)
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more:
     // https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
@@ -64,21 +62,12 @@ dependencies {
     }
 }
 
-idea {
-    module {
-        isDownloadSources = true
-        isDownloadJavadoc = true
-    }
-}
-
 // Configure IntelliJ Platform Gradle Plugin - read more:
 // https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-extension.html
 intellijPlatform {
     pluginConfiguration {
-        val changelog = project.changelog // local variable for configuration cache compatibility
-
         name = providers.gradleProperty("pluginName")
-        version = changelog.getAll().keys.toList().first { Regex("""\d+\.\d+\.\d+""").matches(it) }
+        version = providers.gradleProperty("pluginVersion")
 
         // Extract the <!-- Plugin description --> section from README.md and provide for the
         // plugin's manifest
@@ -99,6 +88,7 @@ intellijPlatform {
                 }
             }
 
+        val changelog = project.changelog // local variable for configuration cache compatibility
         // Get the latest available change notes from the changelog file
         changeNotes =
             providers.gradleProperty("pluginVersion").map { pluginVersion ->
